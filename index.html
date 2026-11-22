@@ -59,7 +59,7 @@ header{position:sticky;top:0;z-index:20;background:#08050bf2;backdrop-filter:blu
 <div class="modal" id="checkoutModal"><div class="modalbox">
 <div class="drawerhead"><h2>Naman Studios Checkout</h2><button class="close" type="button" data-action="checkout-close">×</button></div>
 <div style="text-align:center"><h2 id="checkoutProductName">Ultimate AI Prompt Book</h2><div class="payamount" id="checkoutAmount">₹49</div><p class="notice" id="checkoutDescription">100 Original AI Prompts · English + Hinglish Edition</p>
-<div class="qrwrap"><img src="naman-studios-upi-qr-new.png" alt="Scan to pay using UPI"></div>
+<div class="qrwrap"><img src="Naman-Studios-Clean-UPI-QR.png" alt="Scan to pay using UPI"></div>
 <div class="scanlabel">SCAN &amp; PAY</div>
 <p><b>UPI ID:</b> harshbhadauriya@fam</p>
 <div class="modal-actions"><a class="upi" id="upiPayLink" href="upi://pay?pa=harshbhadauriya%40fam&amp;pn=Naman%20Studios&amp;am=49&amp;cu=INR">Pay ₹49 Using UPI App</a><button type="button" data-action="copy-upi">Copy UPI ID</button></div>
@@ -106,7 +106,7 @@ header{position:sticky;top:0;z-index:20;background:#08050bf2;backdrop-filter:blu
 
 
   function cartTotal() {
-    return cartItems.reduce((sum, item) => sum + item.price, 0);
+    return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
 
 
@@ -114,4 +114,94 @@ header{position:sticky;top:0;z-index:20;background:#08050bf2;backdrop-filter:blu
     const count = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     byId('cartCount').textContent = String(count);
     byId('cartItemsContainer').innerHTML = cartItems.length
-      ? cartItems.map((item, index) => `<div class="cartitem"><div><b>${item.name}</b><div class="muted">₹${item.price} × ${item.quantity}</div><button type="button" data-action="remove-item" data-index="${index}" style="margin-top:7px;background:none;border:0;color:
+      ? cartItems.map((item, index) => `<div class="cartitem"><div><b>${item.name}</b><div class="muted">₹${item.price} × ${item.quantity}</div><button type="button" data-action="remove-item" data-index="${index}" style="margin-top:7px;background:none;border:0;color:#e7bd63;cursor:pointer">Remove</button></div><b>₹${item.price * item.quantity}</b></div>`).join('')
+      : '<p class="muted">Your cart is empty.</p>';
+    byId('cartGrandTotal').textContent = String(cartTotal());
+  }
+
+  function addToCart(productId) {
+    const product = productsData[productId];
+    if (!product) return;
+    const existing = cartItems.find(item => item.id === productId);
+    if (existing) existing.quantity += 1;
+    else cartItems.push({ id: productId, name: product.name, price: product.price, description: product.description, quantity: 1 });
+    renderCart();
+    openCart();
+  }
+
+  function removeItem(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= cartItems.length) return;
+    cartItems.splice(index, 1);
+    renderCart();
+  }
+
+  function openCheckout() {
+    if (!cartItems.length) {
+      alert('Your cart is empty. Please add a product first.');
+      return;
+    }
+    checkoutItems = cartItems.map(item => ({ ...item }));
+    const total = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const names = checkoutItems.map(item => `${item.name} × ${item.quantity}`).join(' + ');
+    const descriptions = checkoutItems.map(item => item.description).join(' | ');
+    orderID = 'NS' + Date.now().toString().slice(-9);
+    byId('checkoutProductName').textContent = names;
+    byId('checkoutAmount').textContent = '₹' + total;
+    byId('checkoutDescription').textContent = descriptions;
+    byId('orderIdDisplay').textContent = 'Order ID: ' + orderID;
+    byId('upiPayLink').href = 'upi://pay?pa=harshbhadauriya%40fam&pn=Naman%20Studios&am=' + total + '&cu=INR&tn=' + encodeURIComponent(orderID);
+    byId('upiPayLink').textContent = 'Pay ₹' + total + ' Using UPI App';
+    closeCart();
+    byId('checkoutModal').classList.add('show');
+  }
+
+  function closeCheckout() {
+    byId('checkoutModal').classList.remove('show');
+  }
+
+  function sendProof(method) {
+    if (!checkoutItems.length) return;
+    const name = byId('buyerName').value.trim();
+    const email = byId('buyerEmail').value.trim();
+    const utr = byId('paymentUTR').value.trim();
+    if (!name || !email || !utr) {
+      alert('Please enter your name, email and UTR / Transaction ID.');
+      return;
+    }
+    const total = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const items = checkoutItems.map(item => `${item.name} × ${item.quantity} — ₹${item.price * item.quantity}`).join('\n');
+    const body = `Naman Studios Order\nOrder ID: ${orderID}\nName: ${name}\nCustomer Email: ${email}\nProducts:\n${items}\nTotal Paid: ₹${total}\nUTR / Transaction ID: ${utr}`;
+    if (method === 'email') {
+      window.location.href = 'mailto:studionaman229@gmail.com?subject=' + encodeURIComponent('Payment Proof - ' + orderID) + '&body=' + encodeURIComponent(body);
+    } else {
+      window.open('https://t.me/NamanStudioSupport', '_blank', 'noopener');
+      alert('Telegram support opened. Please send your Order ID, payment details and transaction proof there.');
+    }
+  }
+
+  document.addEventListener('click', function (event) {
+    const button = event.target.closest('[data-action]');
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === 'cart-open') openCart();
+    else if (action === 'cart-close') closeCart();
+    else if (action === 'add-to-cart') addToCart(button.dataset.product);
+    else if (action === 'remove-item') removeItem(Number(button.dataset.index));
+    else if (action === 'checkout') openCheckout();
+    else if (action === 'checkout-close') closeCheckout();
+    else if (action === 'copy-upi') {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText('harshbhadauriya@fam').then(() => alert('UPI ID copied!')).catch(() => alert('UPI ID: harshbhadauriya@fam'));
+      else alert('UPI ID: harshbhadauriya@fam');
+    }
+    else if (action === 'send-proof') sendProof(button.dataset.method);
+    else if (action === 'flip-prev' || action === 'flip-next') alert('Preview navigation will be available when the flipbook preview is connected.');
+  });
+
+  byId('cartOverlay').addEventListener('click', event => { if (event.target === byId('cartOverlay')) closeCart(); });
+  byId('checkoutModal').addEventListener('click', event => { if (event.target === byId('checkoutModal')) closeCheckout(); });
+  byId('year').textContent = new Date().getFullYear();
+  renderCart();
+})();
+</script>
+</body>
+</html>
